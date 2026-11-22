@@ -1,0 +1,30 @@
+@model ImportSummary?
+@{
+    ViewData["Title"] = "Import CSV";
+}
+
+<h1>Import CSV</h1>
+<p>Upload a CSV file of Daily Results.</p>
+
+<form asp-controller="Import" asp-action="Index" method="post" enctype="multipart/form-data" class="mb-4">
+    <div class="mb-3">
+        <label for="file" class="form-label">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+</form>
+
+@if (Model is not null)
+{
+    <h2>Import summary</h2>
+    <dl class="row">
+        <dt class="col-sm-3">File</dt>
+        <dd class="col-sm-9">@Model.FileName</dd>
+
+        <dt class="col-sm-3">Rows read</dt>
+        <dd class="col-sm-9">@Model.RowsRead</dd>
+
+        <dt class="col-sm-3">Imported</dt>
+        <dd class="col-sm-9">@Model.ImportedCount</dd>
+    </dl>
+}
