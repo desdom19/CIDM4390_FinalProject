@@ -11,23 +11,109 @@ namespace CampaignPerformanceAnalytics.Services;
 /// </summary>
 public class CsvImportService
 {
-    private readonly string _connectionString;
+    /// <summary>The header must have exactly these columns, matched by name in any order and any letter case.</summary>
+    private static readonly IReadOnlyList<string> RequiredColumns =
+        ["campaign_name", "channel", "date", "spend", "impressions", "clicks", "leads", "revenue"];
 
-    public CsvImportService(string connectionString)
+    private const string DatabaseFailureMessage =
+        "The import failed because of a database error. Nothing was saved, so it is safe to try again.";
+
+    private readonly string _connectionString;
+    private readonly ILogger<CsvImportService>? _logger;
+
+    public CsvImportService(string connectionString, ILogger<CsvImportService>? logger = null)
     {
         _connectionString = connectionString;
+        _logger = logger;
     }
 
     public async Task<ImportSummary> ImportAsync(Stream csvStream, string fileName)
     {
-        var summary = new ImportSummary { FileName = fileName };
-
         // GetString(name) matches header names ignoring case and surrounding whitespace.
         // CsvHelper allows rows with a different field count by default (FieldCountMismatch = Allow),
         // so each such row reaches ValidateRowAsync and is rejected on its own.
-        var options = new CsvReaderOptions { TrimWhitespace = true, TrackLineNumbers = true };
+        // The separator is fixed so that a file using another separator fails the header check
+        // instead of being guessed at.
+        var options = new CsvReaderOptions { TrimWhitespace = true, TrackLineNumbers = true, Separator = ',' };
         await using var csv = CsvReader.Create(csvStream, options, leaveOpen: true);
 
+        // File-level checks run before any database connection is opened, so a refused file writes nothing.
+        var headerError = await CheckHeaderAsync(csv);
+        if (headerError is not null)
+        {
+            return ImportSummary.Failure(fileName, headerError);
+        }
+
+        var summary = new ImportSummary { FileName = fileName };
+        try
+        {
+            await ImportRowsAsync(csv, summary);
+            return summary;
+        }
+        catch (MySqlException ex)
+        {
+            // The transaction was never committed, so disposing it rolled every change back.
+            _logger?.LogError(ex, "CSV import of {FileName} failed and was rolled back.", fileName);
+            return ImportSummary.Failure(fileName, DatabaseFailureMessage);
+        }
+    }
+
+    /// <summary>
+    /// Reads the header and returns a message describing why the file is refused, or null when the header is valid.
+    /// </summary>
+    private static async Task<string?> CheckHeaderAsync(CsvReader csv)
+    {
+        IReadOnlyList<string> headers;
+        try
+        {
+            await csv.ReadHeaderAsync();
+            headers = csv.Headers.Select(h => h.Trim()).ToList();
+        }
+        catch (CsvFormatException)
+        {
+            return "The header row could not be read. Check that the file is a comma-separated CSV.";
+        }
+
+        // A header of blank names comes from a file of blank lines or separators only.
+        if (headers.Count == 0 || headers.All(h => h.Length == 0))
+        {
+            return "The file is empty. A Daily Results CSV must start with a header row.";
+        }
+
+        var missing = RequiredColumns
+            .Where(required => !headers.Contains(required, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        // A column that isn't required, or a required column that appears a second time, is extra.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var extra = headers
+            .Where(h => !RequiredColumns.Contains(h, StringComparer.OrdinalIgnoreCase) || !seen.Add(h))
+            .Select(h => h.Length == 0 ? "(blank)" : h)
+            .ToList();
+
+        if (missing.Count == 0 && extra.Count == 0)
+        {
+            return null;
+        }
+
+        var problems = new List<string>();
+        if (missing.Count > 0)
+        {
+            problems.Add($"missing {Plural(missing.Count, "column")} {Quote(missing)}");
+        }
+        if (extra.Count > 0)
+        {
+            problems.Add($"extra {Plural(extra.Count, "column")} {Quote(extra)}");
+        }
+        return $"The header is wrong: {string.Join("; ", problems)}. "
+            + $"It must have exactly these columns, in any order: {string.Join(", ", RequiredColumns)}.";
+
+        static string Plural(int count, string word) => count == 1 ? word : word + "s";
+        static string Quote(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
+    }
+
+    private async Task ImportRowsAsync(CsvReader csv, ImportSummary summary)
+    {
         await using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -76,10 +162,9 @@ public class CsvImportService
         }
 
         await transaction.CommitAsync();
-        return summary;
     }
 
-    private const int ExpectedFieldCount = 8;
+    private static readonly int ExpectedFieldCount = RequiredColumns.Count;
 
     private record ParsedDailyResult(
         string CampaignName, int ChannelId, DateOnly ResultDate,

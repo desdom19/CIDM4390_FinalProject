@@ -7,6 +7,17 @@ public class ImportSummary
 {
     public required string FileName { get; init; }
 
+    /// <summary>
+    /// Set when the whole upload was refused (a file-level problem) or the import failed and was rolled back.
+    /// Nothing was written to the database, and the counts below don't apply.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
+
+    public bool Failed => ErrorMessage is not null;
+
+    public static ImportSummary Failure(string fileName, string errorMessage) =>
+        new() { FileName = fileName, ErrorMessage = errorMessage };
+
     /// <summary>Data rows read from the file (the header is not counted).</summary>
     public int RowsRead { get; set; }
 

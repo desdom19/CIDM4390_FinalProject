@@ -14,7 +14,17 @@
     <button type="submit" class="btn btn-primary">Import</button>
 </form>
 
-@if (Model is not null)
+@if (Model is { Failed: true })
+{
+    <div class="alert alert-danger" role="alert">
+        @if (!string.IsNullOrEmpty(Model.FileName))
+        {
+            <strong>@Model.FileName:</strong>
+        }
+        @Model.ErrorMessage
+    </div>
+}
+else if (Model is not null)
 {
     <h2>Import summary</h2>
     <dl class="row">

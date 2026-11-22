@@ -9,7 +9,8 @@ builder.Services.AddControllersWithViews();
 // Connection string comes from configuration (User Secrets in development).
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
-builder.Services.AddScoped(_ => new CsvImportService(connectionString));
+builder.Services.AddScoped(services =>
+    new CsvImportService(connectionString, services.GetRequiredService<ILogger<CsvImportService>>()));
 
 var app = builder.Build();
 
