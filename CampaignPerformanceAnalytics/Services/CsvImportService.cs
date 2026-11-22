@@ -134,19 +134,17 @@ public class CsvImportService
 
             // Only a valid row reaches here, so a rejected row is never counted as a duplicate
             // and a Campaign is never created from a rejected row.
-            var existingCampaignId = await FindCampaignIdAsync(connection, transaction, dailyResult.CampaignName);
-
             // Earlier accepted rows from this file are already inserted in this transaction,
             // so one lookup catches duplicates from the database and from the same file.
             // The first Daily Result stands, even if the duplicate's figures differ.
-            if (existingCampaignId is not null
-                && await DailyResultExistsAsync(connection, transaction, existingCampaignId.Value, dailyResult.ResultDate))
+            if (dailyResult.ExistingCampaignId is { } existingCampaignId
+                && await DailyResultExistsAsync(connection, transaction, existingCampaignId, dailyResult.ResultDate))
             {
                 summary.DuplicateCount++;
                 continue;
             }
 
-            var campaignId = existingCampaignId
+            var campaignId = dailyResult.ExistingCampaignId
                 ?? await CreateCampaignAsync(connection, transaction, dailyResult.CampaignName, dailyResult.ChannelId, dailyResult.ResultDate);
 
             await InsertDailyResultAsync(connection, transaction, campaignId, dailyResult.ResultDate,
@@ -166,16 +164,19 @@ public class CsvImportService
 
     private static readonly int ExpectedFieldCount = RequiredColumns.Count;
 
-    private record ParsedDailyResult(
-        string CampaignName, int ChannelId, DateOnly ResultDate,
+    /// <param name="ExistingCampaignId">The Campaign's id if it already exists, otherwise null.</param>
+    private record ValidatedDailyResult(
+        string CampaignName, int ChannelId, int? ExistingCampaignId, DateOnly ResultDate,
         decimal Spend, int Impressions, int Clicks, int Leads, decimal Revenue);
+
+    private record CampaignMatch(int CampaignId, string CampaignName, int ChannelId, string ChannelName);
 
     /// <summary>
     /// Trims every field and checks the row against every validation rule.
-    /// Returns the parsed row, or null with every failure added to <paramref name="reasons"/>.
+    /// Returns the validated row, or null with every failure added to <paramref name="reasons"/>.
     /// Plausibility (clicks ≤ impressions, leads ≤ clicks, revenue 0 when leads are 0) is not checked.
     /// </summary>
-    private static async Task<ParsedDailyResult?> ValidateRowAsync(
+    private static async Task<ValidatedDailyResult?> ValidateRowAsync(
         CsvReader csv, MySqlConnection connection, MySqlTransaction transaction, List<string> reasons)
     {
         // With the wrong field count the values can't be matched to their columns,
@@ -222,12 +223,25 @@ public class CsvImportService
             }
         }
 
+        // A Campaign always runs on exactly one Channel: the one stored with it, which its first
+        // accepted row set. Campaigns created earlier in this import are found too, because the
+        // lookup runs inside the import's transaction.
+        CampaignMatch? campaign = null;
+        if (campaignName.Length > 0)
+        {
+            campaign = await FindCampaignAsync(connection, transaction, campaignName);
+            if (campaign is not null && channelId is not null && campaign.ChannelId != channelId)
+            {
+                reasons.Add($"Campaign '{campaign.CampaignName}' belongs to channel '{campaign.ChannelName}', not '{channelName}'.");
+            }
+        }
+
         if (reasons.Count > 0)
         {
             return null;
         }
 
-        return new ParsedDailyResult(campaignName, channelId!.Value, resultDate!.Value,
+        return new ValidatedDailyResult(campaignName, channelId!.Value, campaign?.CampaignId, resultDate!.Value,
             spend!.Value, impressions!.Value, clicks!.Value, leads!.Value, revenue!.Value);
     }
 
@@ -290,15 +304,26 @@ public class CsvImportService
 
     // The campaign_name column's case-insensitive collation decides the match.
     // Runs inside the transaction, so it also finds Campaigns created earlier in this import.
-    private static async Task<int?> FindCampaignIdAsync(
+    private static async Task<CampaignMatch?> FindCampaignAsync(
         MySqlConnection connection, MySqlTransaction transaction, string campaignName)
     {
         await using var command = new MySqlCommand(
-            "SELECT campaign_id FROM campaigns WHERE campaign_name = @name LIMIT 1;",
+            """
+            SELECT c.campaign_id, c.campaign_name, c.channel_id, ch.channel_name
+              FROM campaigns c
+              JOIN channels ch ON ch.channel_id = c.channel_id
+             WHERE c.campaign_name = @name
+             LIMIT 1;
+            """,
             connection, transaction);
         command.Parameters.AddWithValue("@name", campaignName);
-        var result = await command.ExecuteScalarAsync();
-        return result is null ? null : Convert.ToInt32(result);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+        return new CampaignMatch(
+            reader.GetInt32(0), reader.GetString(1), reader.GetInt32(2), reader.GetString(3));
     }
 
     // A Duplicate Daily Result is keyed on Campaign + date only; the figures don't matter.
