@@ -12,4 +12,13 @@ public class ImportSummary
 
     /// <summary>Daily Results inserted into the results table.</summary>
     public int ImportedCount { get; set; }
+
+    /// <summary>Rows that failed validation. Each rejected row counts once, however many reasons it has.</summary>
+    public int RejectedCount => RejectedRows.Count;
+
+    public List<RejectedRow> RejectedRows { get; } = [];
 }
+
+/// <summary>A row that failed validation, with every reason it failed.</summary>
+/// <param name="LineNumber">The file line number, with the header as line 1.</param>
+public record RejectedRow(int LineNumber, IReadOnlyList<string> Reasons);

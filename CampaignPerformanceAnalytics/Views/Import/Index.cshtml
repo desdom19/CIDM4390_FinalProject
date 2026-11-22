@@ -26,5 +26,38 @@
 
         <dt class="col-sm-3">Imported</dt>
         <dd class="col-sm-9">@Model.ImportedCount</dd>
+
+        <dt class="col-sm-3">Rejected</dt>
+        <dd class="col-sm-9">@Model.RejectedCount</dd>
     </dl>
+
+    @if (Model.RejectedRows.Count > 0)
+    {
+        <h3>Rejected rows</h3>
+        <p class="text-muted">Line is the line number in the file; the header is line 1.</p>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Line</th>
+                    <th scope="col">Reason(s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.RejectedRows)
+                {
+                    <tr>
+                        <td>@row.LineNumber</td>
+                        <td>
+                            <ul class="mb-0 ps-3">
+                                @foreach (var reason in row.Reasons)
+                                {
+                                    <li>@reason</li>
+                                }
+                            </ul>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 }

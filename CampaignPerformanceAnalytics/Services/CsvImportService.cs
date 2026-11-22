@@ -23,7 +23,9 @@ public class CsvImportService
         var summary = new ImportSummary { FileName = fileName };
 
         // GetString(name) matches header names ignoring case and surrounding whitespace.
-        var options = new CsvReaderOptions { TrimWhitespace = true };
+        // CsvHelper allows rows with a different field count by default (FieldCountMismatch = Allow),
+        // so each such row reaches ValidateRowAsync and is rejected on its own.
+        var options = new CsvReaderOptions { TrimWhitespace = true, TrackLineNumbers = true };
         await using var csv = CsvReader.Create(csvStream, options, leaveOpen: true);
 
         await using var connection = new MySqlConnection(_connectionString);
@@ -36,23 +38,20 @@ public class CsvImportService
         {
             summary.RowsRead++;
 
-            var campaignName = csv.GetString("campaign_name");
-            var channelName = csv.GetString("channel");
-            var resultDate = DateOnly.ParseExact(csv.GetString("date"), "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var spend = decimal.Parse(csv.GetString("spend"), NumberStyles.Number, CultureInfo.InvariantCulture);
-            var impressions = int.Parse(csv.GetString("impressions"), NumberStyles.Integer, CultureInfo.InvariantCulture);
-            var clicks = int.Parse(csv.GetString("clicks"), NumberStyles.Integer, CultureInfo.InvariantCulture);
-            var leads = int.Parse(csv.GetString("leads"), NumberStyles.Integer, CultureInfo.InvariantCulture);
-            var revenue = decimal.Parse(csv.GetString("revenue"), NumberStyles.Number, CultureInfo.InvariantCulture);
+            var reasons = new List<string>();
+            var dailyResult = await ValidateRowAsync(csv, connection, transaction, reasons);
+            if (dailyResult is null)
+            {
+                summary.RejectedRows.Add(new RejectedRow(checked((int)csv.LineNumber), reasons));
+                continue;
+            }
 
-            var channelId = await FindChannelIdAsync(connection, transaction, channelName)
-                ?? throw new InvalidOperationException($"Channel '{channelName}' is not a seeded Channel.");
+            // Only a valid row reaches here, so a Campaign is never created from a rejected row.
+            var campaignId = await FindCampaignIdAsync(connection, transaction, dailyResult.CampaignName)
+                ?? await CreateCampaignAsync(connection, transaction, dailyResult.CampaignName, dailyResult.ChannelId, dailyResult.ResultDate);
 
-            var campaignId = await FindCampaignIdAsync(connection, transaction, campaignName)
-                ?? await CreateCampaignAsync(connection, transaction, campaignName, channelId, resultDate);
-
-            await InsertDailyResultAsync(connection, transaction, campaignId, resultDate,
-                spend, impressions, clicks, leads, revenue);
+            await InsertDailyResultAsync(connection, transaction, campaignId, dailyResult.ResultDate,
+                dailyResult.Spend, dailyResult.Impressions, dailyResult.Clicks, dailyResult.Leads, dailyResult.Revenue);
 
             affectedCampaignIds.Add(campaignId);
             summary.ImportedCount++;
@@ -65,6 +64,118 @@ public class CsvImportService
 
         await transaction.CommitAsync();
         return summary;
+    }
+
+    private const int ExpectedFieldCount = 8;
+
+    private record ParsedDailyResult(
+        string CampaignName, int ChannelId, DateOnly ResultDate,
+        decimal Spend, int Impressions, int Clicks, int Leads, decimal Revenue);
+
+    /// <summary>
+    /// Trims every field and checks the row against every validation rule.
+    /// Returns the parsed row, or null with every failure added to <paramref name="reasons"/>.
+    /// Plausibility (clicks ≤ impressions, leads ≤ clicks, revenue 0 when leads are 0) is not checked.
+    /// </summary>
+    private static async Task<ParsedDailyResult?> ValidateRowAsync(
+        CsvReader csv, MySqlConnection connection, MySqlTransaction transaction, List<string> reasons)
+    {
+        // With the wrong field count the values can't be matched to their columns,
+        // so any further reasons would be misleading.
+        if (csv.FieldCount != ExpectedFieldCount)
+        {
+            reasons.Add($"Row has {csv.FieldCount} fields; expected {ExpectedFieldCount}.");
+            return null;
+        }
+
+        string ReadRequiredField(string column)
+        {
+            var value = csv.GetString(column).Trim();
+            if (value.Length == 0)
+            {
+                reasons.Add($"{column} is empty.");
+            }
+            return value;
+        }
+
+        var campaignName = ReadRequiredField("campaign_name");
+        var channelName = ReadRequiredField("channel");
+        var dateText = ReadRequiredField("date");
+        var spendText = ReadRequiredField("spend");
+        var impressionsText = ReadRequiredField("impressions");
+        var clicksText = ReadRequiredField("clicks");
+        var leadsText = ReadRequiredField("leads");
+        var revenueText = ReadRequiredField("revenue");
+
+        var resultDate = ParseDate(dateText, reasons);
+        var spend = ParseAmount("spend", spendText, reasons);
+        var impressions = ParseCount("impressions", impressionsText, reasons);
+        var clicks = ParseCount("clicks", clicksText, reasons);
+        var leads = ParseCount("leads", leadsText, reasons);
+        var revenue = ParseAmount("revenue", revenueText, reasons);
+
+        int? channelId = null;
+        if (channelName.Length > 0)
+        {
+            channelId = await FindChannelIdAsync(connection, transaction, channelName);
+            if (channelId is null)
+            {
+                reasons.Add($"channel '{channelName}' is not a known Channel.");
+            }
+        }
+
+        if (reasons.Count > 0)
+        {
+            return null;
+        }
+
+        return new ParsedDailyResult(campaignName, channelId!.Value, resultDate!.Value,
+            spend!.Value, impressions!.Value, clicks!.Value, leads!.Value, revenue!.Value);
+    }
+
+    // Empty values return null without a reason; ReadRequiredField already reported them.
+    private static DateOnly? ParseDate(string value, List<string> reasons)
+    {
+        if (value.Length == 0) return null;
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date;
+        }
+        reasons.Add($"date '{value}' is not a valid date in yyyy-MM-dd form.");
+        return null;
+    }
+
+    private static decimal? ParseAmount(string column, string value, List<string> reasons)
+    {
+        if (value.Length == 0) return null;
+        if (!decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var amount))
+        {
+            reasons.Add($"{column} '{value}' is not a decimal number.");
+            return null;
+        }
+        if (amount < 0)
+        {
+            reasons.Add($"{column} '{value}' must be 0 or more.");
+            return null;
+        }
+        return amount;
+    }
+
+    private static int? ParseCount(string column, string value, List<string> reasons)
+    {
+        if (value.Length == 0) return null;
+        if (!int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var count))
+        {
+            reasons.Add($"{column} '{value}' is not a whole number.");
+            return null;
+        }
+        if (count < 0)
+        {
+            reasons.Add($"{column} '{value}' must be 0 or more.");
+            return null;
+        }
+        return count;
     }
 
     // The channel_name column's case-insensitive collation decides the match.
