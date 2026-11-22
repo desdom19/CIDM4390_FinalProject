@@ -46,8 +46,21 @@ public class CsvImportService
                 continue;
             }
 
-            // Only a valid row reaches here, so a Campaign is never created from a rejected row.
-            var campaignId = await FindCampaignIdAsync(connection, transaction, dailyResult.CampaignName)
+            // Only a valid row reaches here, so a rejected row is never counted as a duplicate
+            // and a Campaign is never created from a rejected row.
+            var existingCampaignId = await FindCampaignIdAsync(connection, transaction, dailyResult.CampaignName);
+
+            // Earlier accepted rows from this file are already inserted in this transaction,
+            // so one lookup catches duplicates from the database and from the same file.
+            // The first Daily Result stands, even if the duplicate's figures differ.
+            if (existingCampaignId is not null
+                && await DailyResultExistsAsync(connection, transaction, existingCampaignId.Value, dailyResult.ResultDate))
+            {
+                summary.DuplicateCount++;
+                continue;
+            }
+
+            var campaignId = existingCampaignId
                 ?? await CreateCampaignAsync(connection, transaction, dailyResult.CampaignName, dailyResult.ChannelId, dailyResult.ResultDate);
 
             await InsertDailyResultAsync(connection, transaction, campaignId, dailyResult.ResultDate,
@@ -201,6 +214,18 @@ public class CsvImportService
         command.Parameters.AddWithValue("@name", campaignName);
         var result = await command.ExecuteScalarAsync();
         return result is null ? null : Convert.ToInt32(result);
+    }
+
+    // A Duplicate Daily Result is keyed on Campaign + date only; the figures don't matter.
+    private static async Task<bool> DailyResultExistsAsync(
+        MySqlConnection connection, MySqlTransaction transaction, int campaignId, DateOnly resultDate)
+    {
+        await using var command = new MySqlCommand(
+            "SELECT 1 FROM results WHERE campaign_id = @campaignId AND result_date = @date LIMIT 1;",
+            connection, transaction);
+        command.Parameters.AddWithValue("@campaignId", campaignId);
+        command.Parameters.AddWithValue("@date", resultDate);
+        return await command.ExecuteScalarAsync() is not null;
     }
 
     // start_date and end_date are NOT NULL, so a new Campaign starts with its first row's date;
