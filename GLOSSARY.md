@@ -16,6 +16,10 @@ _Avoid_: Ad, promotion, initiative
 One campaign's spend, impressions, clicks, leads, and revenue on a single date.
 _Avoid_: Record, entry, metric, row
 
+**Duplicate Daily Result**:
+A Daily Result for a campaign and date that already has one. The first one stands and the duplicate is not imported, even if its figures differ.
+_Avoid_: Repeat, double, copy
+
 **ROI**:
 Return on investment: (revenue − spend) ÷ spend, for a campaign or a channel over a period. 1.00 means a 100% return; 0 means break-even.
 _Avoid_: ROAS, return (unqualified)

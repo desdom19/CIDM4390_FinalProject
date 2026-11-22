@@ -1,3 +1,4 @@
+using CampaignPerformanceAnalytics.Services;
 using MySqlConnector;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,9 +6,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Connection string comes from configuration (User Secrets in development).
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+builder.Services.AddScoped(services =>
+    new CsvImportService(connectionString, services.GetRequiredService<ILogger<CsvImportService>>()));
+
 var app = builder.Build();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 await using (var connection = new MySqlConnection(connectionString))
 {
     await connection.OpenAsync();

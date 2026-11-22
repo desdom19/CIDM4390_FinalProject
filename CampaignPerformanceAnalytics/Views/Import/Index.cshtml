@@ -1,0 +1,76 @@
+@model ImportSummary?
+@{
+    ViewData["Title"] = "Import CSV";
+}
+
+<h1>Import CSV</h1>
+<p>Upload a CSV file of Daily Results.</p>
+
+<form asp-controller="Import" asp-action="Index" method="post" enctype="multipart/form-data" class="mb-4">
+    <div class="mb-3">
+        <label for="file" class="form-label">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+</form>
+
+@if (Model is { Failed: true })
+{
+    <div class="alert alert-danger" role="alert">
+        @if (!string.IsNullOrEmpty(Model.FileName))
+        {
+            <strong>@Model.FileName:</strong>
+        }
+        @Model.ErrorMessage
+    </div>
+}
+else if (Model is not null)
+{
+    <h2>Import summary</h2>
+    <dl class="row">
+        <dt class="col-sm-3">File</dt>
+        <dd class="col-sm-9">@Model.FileName</dd>
+
+        <dt class="col-sm-3">Rows read</dt>
+        <dd class="col-sm-9">@Model.RowsRead</dd>
+
+        <dt class="col-sm-3">Imported</dt>
+        <dd class="col-sm-9">@Model.ImportedCount</dd>
+
+        <dt class="col-sm-3">Duplicates skipped</dt>
+        <dd class="col-sm-9">@Model.DuplicateCount</dd>
+
+        <dt class="col-sm-3">Rejected</dt>
+        <dd class="col-sm-9">@Model.RejectedCount</dd>
+    </dl>
+
+    @if (Model.RejectedRows.Count > 0)
+    {
+        <h3>Rejected rows</h3>
+        <p class="text-muted">Line is the line number in the file; the header is line 1.</p>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Line</th>
+                    <th scope="col">Reason(s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.RejectedRows)
+                {
+                    <tr>
+                        <td>@row.LineNumber</td>
+                        <td>
+                            <ul class="mb-0 ps-3">
+                                @foreach (var reason in row.Reasons)
+                                {
+                                    <li>@reason</li>
+                                }
+                            </ul>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
