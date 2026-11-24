@@ -17,4 +17,12 @@ public record KpiTotals(
     decimal TotalRevenue,
     long TotalLeads,
     long TotalImpressions,
-    long TotalClicks);
+    long TotalClicks)
+{
+    /// <summary>
+    /// ROI of all Campaigns together: (total revenue − total spend) ÷ total spend, from the same
+    /// totals the spend and revenue tiles show; never an average of each Campaign's ROI.
+    /// Null when total spend is exactly 0, whatever the revenue.
+    /// </summary>
+    public decimal? OverallRoi => TotalSpend == 0 ? null : (TotalRevenue - TotalSpend) / TotalSpend;
+}

@@ -27,6 +27,19 @@ public sealed class KpiFormatterTests(VerificationReport report, ITestOutputHelp
     public void Count_is_a_whole_number_with_commas(long input, string expected) =>
         Check("01", $"Count {input}", expected, KpiFormatter.Count(input));
 
+    // ROI inputs are written as invariant-culture text too; null stands for "no ROI" (total spend is 0).
+    [Theory]
+    [InlineData("0.813640", "81.4%")]
+    [InlineData("0.81350", "81.4%")]     // a midpoint rounds away from zero
+    [InlineData("-0.12345", "-12.3%")]   // a loss keeps its minus sign
+    [InlineData("-0.0004", "0.0%")]      // rounds to zero: never "-0.0%"
+    [InlineData(null, "N/A (spend is 0)")]
+    public void Roi_is_a_percentage_with_one_decimal(string? input, string expected)
+    {
+        decimal? value = input is null ? null : decimal.Parse(input, CultureInfo.InvariantCulture);
+        Check("02", $"ROI {input ?? "null"}", expected, KpiFormatter.Roi(value));
+    }
+
     /// <param name="sourceTicket">The dashboard-kpi-tiles ticket whose behaviour the test covers, e.g. "01".</param>
     private void Check(string sourceTicket, string title, string expected, string actual)
     {
