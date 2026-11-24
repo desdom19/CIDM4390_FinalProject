@@ -1,0 +1,34 @@
+@using CampaignPerformanceAnalytics.Services
+@model DashboardResult
+@{
+    ViewData["Title"] = "Dashboard";
+
+    // Every value shown is text from KpiFormatter, in the tile order the spec sets.
+    var totals = Model.Totals;
+    var tiles = new (string Label, string Value)[]
+    {
+        ("Total Spend", KpiFormatter.Money(totals.TotalSpend)),
+        ("Total Revenue", KpiFormatter.Money(totals.TotalRevenue)),
+        ("Total Leads", KpiFormatter.Count(totals.TotalLeads)),
+        ("Total Impressions", KpiFormatter.Count(totals.TotalImpressions)),
+        ("Total Clicks", KpiFormatter.Count(totals.TotalClicks)),
+    };
+}
+
+<h1>Dashboard</h1>
+<p>Totals over every Daily Result of every Campaign and Channel.</p>
+
+@* Three tiles per row on a desktop, two on a tablet, one on a phone. *@
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+    @foreach (var tile in tiles)
+    {
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">@tile.Label</div>
+                    <div class="fs-2 fw-semibold">@tile.Value</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
