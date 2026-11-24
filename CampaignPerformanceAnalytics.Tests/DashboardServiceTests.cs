@@ -1,4 +1,5 @@
 using System.Text;
+using CampaignPerformanceAnalytics.Models;
 using CampaignPerformanceAnalytics.Services;
 using Xunit.Abstractions;
 
@@ -26,7 +27,7 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
         {
             await ImportSampleAsync("campaign_results_clean.csv");
 
-            var totals = (await database.CreateDashboardService().GetKpiTotalsAsync()).Totals;
+            var totals = await GetTotalsAsync();
 
             checks.Equal("Total Spend", 45256.13m, totals.TotalSpend);
             checks.Equal("Total Revenue", 82078.31m, totals.TotalRevenue);
@@ -40,7 +41,7 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
             checks.Equal("Total Impressions tile", "4,995,183", KpiFormatter.Count(totals.TotalImpressions));
             checks.Equal("Total Clicks tile", "37,882", KpiFormatter.Count(totals.TotalClicks));
 
-            // Ticket 02: (82,078.31 âˆ’ 45,256.13) Ã· 45,256.13 = 0.813640â€¦, checked to 4 decimals.
+            // Ticket 02: (82,078.31 − 45,256.13) ÷ 45,256.13 = 0.813640…, checked to 4 decimals.
             checks.Equal("Overall ROI (to 4 decimals)", 0.8136m, RoundedTo4Decimals(totals.OverallRoi));
             checks.Equal("Overall ROI tile", "81.4%", KpiFormatter.Roi(totals.OverallRoi));
         });
@@ -53,7 +54,7 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
                 "Cart Reminder Email,email,2026-09-01,0.00,500,20,2,120.50",
                 "Cart Reminder Email,email,2026-09-02,0.00,450,18,1,79.25");
 
-            var totals = (await database.CreateDashboardService().GetKpiTotalsAsync()).Totals;
+            var totals = await GetTotalsAsync();
 
             checks.Equal("Total Spend", 0m, totals.TotalSpend);
             checks.Equal("Overall ROI", (decimal?)null, totals.OverallRoi);
@@ -65,15 +66,39 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
     public Task Overall_ROI_is_calculated_from_the_totals_not_averaged_over_Campaigns() =>
         RunAsync("02", "Overall ROI uses totals, not an average", async checks =>
         {
-            // The glossary's ROI example: ROIs of +200% and âˆ’50% average +75%, but together
-            // (5,300 âˆ’ 10,100) Ã· 10,100 = âˆ’47.5%.
+            // The glossary's ROI example: ROIs of +200% and −50% average +75%, but together
+            // (5,300 − 10,100) ÷ 10,100 = −47.5%.
             await ImportLinesAsync(Header,
                 "Brand Keywords Search,search,2026-09-01,100.00,1000,50,5,300.00",
                 "Awareness Banner Display,display,2026-09-01,10000.00,90000,400,20,5000.00");
 
-            var totals = (await database.CreateDashboardService().GetKpiTotalsAsync()).Totals;
+            var totals = await GetTotalsAsync();
 
             checks.Equal("Overall ROI tile", "-47.5%", KpiFormatter.Roi(totals.OverallRoi));
+        });
+
+    [Fact]
+    public Task Empty_tables_give_zero_tiles_and_show_there_are_no_Daily_Results() =>
+        RunAsync("03", "Empty tables: zero tiles, ROI N/A, no Daily Results", async checks =>
+        {
+            // InitializeAsync has already emptied results and campaigns.
+            var totals = await GetTotalsAsync();
+
+            checks.Equal("Has Daily Results", false, totals.HasDailyResults);
+
+            checks.Equal("Total Spend", 0m, totals.TotalSpend);
+            checks.Equal("Total Revenue", 0m, totals.TotalRevenue);
+            checks.Equal("Total Leads", 0L, totals.TotalLeads);
+            checks.Equal("Total Impressions", 0L, totals.TotalImpressions);
+            checks.Equal("Total Clicks", 0L, totals.TotalClicks);
+            checks.Equal("Overall ROI", (decimal?)null, totals.OverallRoi);
+
+            checks.Equal("Total Spend tile", "$0.00", KpiFormatter.Money(totals.TotalSpend));
+            checks.Equal("Total Revenue tile", "$0.00", KpiFormatter.Money(totals.TotalRevenue));
+            checks.Equal("Total Leads tile", "0", KpiFormatter.Count(totals.TotalLeads));
+            checks.Equal("Total Impressions tile", "0", KpiFormatter.Count(totals.TotalImpressions));
+            checks.Equal("Total Clicks tile", "0", KpiFormatter.Count(totals.TotalClicks));
+            checks.Equal("Overall ROI tile", "N/A (spend is 0)", KpiFormatter.Roi(totals.OverallRoi));
         });
 
     // ---- helpers ----
@@ -98,6 +123,14 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
         checks.AssertAll();
     }
 
+    /// <summary>Reads the totals, requiring the read to have succeeded.</summary>
+    private async Task<KpiTotals> GetTotalsAsync()
+    {
+        var result = await database.CreateDashboardService().GetKpiTotalsAsync();
+        Assert.False(result.Failed, result.ErrorMessage);
+        return result.Totals;
+    }
+
     private static decimal? RoundedTo4Decimals(decimal? value) => value is null ? null : Math.Round(value.Value, 4);
 
     private async Task ImportSampleAsync(string fileName)
@@ -116,5 +149,39 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
         // The totals only mean something if every data row was imported.
         Assert.Null(summary.ErrorMessage);
         Assert.Equal(lines.Length - 1, summary.ImportedCount);
+    }
+}
+
+/// <summary>
+/// The dashboard when the database can't be reached. These tests touch no database at all: there is
+/// no table-emptying setup, and the service is pointed at a port where nothing listens. They stay in
+/// the "Test database" collection only so that their checks are recorded in the dashboard report.
+/// </summary>
+[Collection(TestDatabaseCollection.Name)]
+public sealed class DashboardServiceDatabaseFailureTests(VerificationReport report, ITestOutputHelper output)
+{
+    private const string UnreachableConnectionString =
+        "Server=127.0.0.1;Port=1;Database=campaign_analytics_test;User ID=nobody;Password=none;Connection Timeout=2";
+
+    [Fact]
+    public async Task Unreachable_database_gives_an_error_result_with_no_totals()
+    {
+        var checks = report.StartTest(ReportFeature.DashboardKpiTiles, "03",
+            "Database can't be reached: error message, no totals", output);
+        try
+        {
+            var result = await new DashboardService(UnreachableConnectionString).GetKpiTotalsAsync();
+
+            checks.Equal("Failed", true, result.Failed);
+            checks.Equal("Error message",
+                "The dashboard couldn't load because of a database error. Try again later.", result.ErrorMessage);
+            checks.Equal("Totals", (KpiTotals?)null, result.Totals);
+        }
+        catch (Exception ex)
+        {
+            checks.Stopped(ex);
+            throw;
+        }
+        checks.AssertAll();
     }
 }

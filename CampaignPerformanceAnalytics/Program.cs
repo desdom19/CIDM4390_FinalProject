@@ -11,7 +11,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 builder.Services.AddScoped(services =>
     new CsvImportService(connectionString, services.GetRequiredService<ILogger<CsvImportService>>()));
-builder.Services.AddScoped(_ => new DashboardService(connectionString));
+builder.Services.AddScoped(services =>
+    new DashboardService(connectionString, services.GetRequiredService<ILogger<DashboardService>>()));
 
 var app = builder.Build();
 

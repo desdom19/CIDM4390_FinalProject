@@ -2,7 +2,18 @@
 @model DashboardResult
 @{
     ViewData["Title"] = "Dashboard";
+}
 
+<h1>Dashboard</h1>
+<p>Totals over every Daily Result of every Campaign and Channel.</p>
+
+@if (Model.Failed)
+{
+    @* The message replaces the tiles: a failure is never shown as zeros. *@
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+else
+{
     // Every value shown is text from KpiFormatter, in the tile order the spec sets.
     var totals = Model.Totals;
     var tiles = new (string Label, string Value)[]
@@ -14,22 +25,26 @@
         ("Total Clicks", KpiFormatter.Count(totals.TotalClicks)),
         ("Overall ROI", KpiFormatter.Roi(totals.OverallRoi)),
     };
-}
 
-<h1>Dashboard</h1>
-<p>Totals over every Daily Result of every Campaign and Channel.</p>
-
-@* Three tiles per row on a desktop, two on a tablet, one on a phone. *@
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-    @foreach (var tile in tiles)
+    if (!totals.HasDailyResults)
     {
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="small text-muted">@tile.Label</div>
-                    <div class="fs-2 fw-semibold">@tile.Value</div>
+        <p class="alert alert-secondary">
+            No Daily Results yet. <a asp-controller="Import" asp-action="Index">Import a CSV</a> to see your totals.
+        </p>
+    }
+
+    @* Three tiles per row on a desktop, two on a tablet, one on a phone. *@
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+        @foreach (var tile in tiles)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="small text-muted">@tile.Label</div>
+                        <div class="fs-2 fw-semibold">@tile.Value</div>
+                    </div>
                 </div>
             </div>
-        </div>
-    }
-</div>
+        }
+    </div>
+}
