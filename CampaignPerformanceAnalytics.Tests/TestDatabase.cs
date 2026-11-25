@@ -41,6 +41,8 @@ public sealed class TestDatabase
 
     public CsvImportService CreateImportService() => new(_connectionString);
 
+    public DashboardService CreateDashboardService() => new(_connectionString);
+
     /// <summary>Empties results and campaigns. Channels are left alone.</summary>
     public async Task EmptyResultsAndCampaignsAsync()
     {

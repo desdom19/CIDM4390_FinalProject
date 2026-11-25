@@ -238,7 +238,7 @@ public sealed class CsvImportServiceTests(TestDatabase database, VerificationRep
     /// <param name="sourceTicket">The csv-import ticket whose behaviour the test covers, e.g. "03".</param>
     private async Task RunAsync(string sourceTicket, string title, Func<TestChecks, Task> body)
     {
-        var checks = report.StartTest(sourceTicket, title, output);
+        var checks = report.StartTest(ReportFeature.CsvImport, sourceTicket, title, output);
         try
         {
             await body(checks);

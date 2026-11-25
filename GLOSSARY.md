@@ -21,8 +21,8 @@ A Daily Result for a campaign and date that already has one. The first one stand
 _Avoid_: Repeat, double, copy
 
 **ROI**:
-Return on investment: (revenue − spend) ÷ spend, for a campaign or a channel over a period. 1.00 means a 100% return; 0 means break-even.
-_Avoid_: ROAS, return (unqualified)
+Return on investment: (revenue − spend) ÷ spend, for a campaign, a channel, or all campaigns together over a period, always computed from total revenue and total spend. 1.00 means a 100% return; 0 means break-even. A $100 campaign earning $300 and a $10,000 campaign earning $5,000 have an ROI together of (5,300 − 10,100) ÷ 10,100 = −47.5%, not the +75% average of their ROIs.
+_Avoid_: ROAS, return (unqualified), average ROI
 
 **ROI Goal**:
 The ROI a campaign is expected to reach.

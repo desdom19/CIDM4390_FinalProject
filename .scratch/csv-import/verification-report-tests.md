@@ -1,6 +1,6 @@
 # Verification report: automated CSV import tests
 
-- Run: 2026-11-22 13:15:39
+- Run: 2026-11-23 21:26:14
 - Database: `campaign_analytics_test` (results and campaigns emptied before each test; Channels untouched)
 - Seam: `CsvImportService.ImportAsync`. Each test feeds a CSV stream and checks the returned `ImportSummary` and the rows in the database.
 - Tests: 12 of 12 passed
