@@ -34,3 +34,10 @@
     - USE campaign_analytics;
     SELECT COUNT(*) FROM results;
     SELECT COUNT(*) FROM campaigns;
+
+**Verification screenshots:**
+-  The dashboard with the clean sample data CSV file imported
+![Dashboard with the clean CSV file imported](.scratch\dashboard-kpi-tiles\images\DashboardcleanCSVimported.png)
+
+- The dashboard with an empty results table
+![Dashboard with the empty results table](.scratch\dashboard-kpi-tiles\images\Dashboardemptyresultstable.png)
