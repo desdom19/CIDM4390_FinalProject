@@ -89,3 +89,57 @@ Tests:
 - How CsvHelper works such as how it handles the parsing (e.g., quoted fields, commas insider values, mapping headers to columns).
 - Validation vs. plausability. Validation checks are utilized to verify if values are correct according to the database field rules (e.g., date being in yyyy-MM-dd order), while plausability is used to check whether the values make sense in the context they're in within the database. Plausability issues were not implemented in this PBI to draw a line on what the import's job is: reject broken data, not judge the data. 
 - A database transaction is a group of database actions that makes sure multi-step changes occur all at once, or never at all. For example, if the database fails, a transaction prevents the file from being half-loaded in the database, and instead undoes everything already done in the transaction (rollback). A rollback allows a user to simply upload the file again instead of wondering up to how much of the file was loaded. 
+
+## PBI 5 Agent log
+
+**Tool:** 
+Claude Agentic Coding was used to generate a dashboard page, a dashboard link in the navigation bar, five total KPI tiles (spend, revenue, leads, impressions, clicks), and an ROI tile. Addititionally, agentic coding was utilized to formulate calculations on each of the KPI tiles.
+
+**Process used:** 
+The grill-with-docs process was used to turn PBI 5 into a spec and four tickets (the 4th ticket was a manual check reserved for the developer). This was followed by the implementation that generated the dashboard page, dashboard link, five total KPI tiles, the ROI tile, and the calculations that went into each KPI tile.
+
+**What it generated:** 
+
+Spec and tickets:
+- spec.md: the PBI 5 spec.
+- issues/01-tracer-bullet-five-total-tiles.md
+- issues/02-overall-roi-tile.md
+- issues/03-empty-and-database-failure-states.md
+- issues/04-final-manual-check-and-notes.md
+- manual-kpi-queries.sql
+- verification-report-tests.md: written automatically by each test run.
+- verification-report-manual.md: the figures from the manual check against campaign_analytics.
+
+App Code:
+- Services/DashboardService.cs: reads the five totals (spend, revenue, leads, impressions, clicks) from the results table in one SQL query, and returns an error result if the database can't be reached.
+- Services/KpiFormatter.cs: turns the figures into tile text ($45,256.13, 4,995,183, 81.4%, "N/A (spend is 0)").
+- Controllers/DashboardController.cs: the /Dashboard page.
+- Models/DashboardResult.cs: the totals or an error message, and KpiTotals, where Overall ROI is calculated.
+- Views/Dashboard/Index.cshtml: the six KPI tiles, the empty-state hint and the database error message.
+- Views/Shared/_Layout.cshtml: adds the "Dashboard" nav link between Home and Import CSV.
+- Program.cs
+
+Tests:
+- DashboardServiceTests.cs: 5 tests.
+- KpiFormatterTests.cs: 9 tests.
+- VerificationReport.cs: now writes one report per feature folder.
+- TestDatabase.cs
+- CsvImportServiceTests.cs: tagged with its feature folder so its report stays under .scratch/csv-import/.
+
+**How the dashboard tile creation was checked:** 
+- Automated tests against campaign_analytics_test where the clean file gave the five totals, and the empty tables and zero-spend cases gave 0 and N/A (spend is 0).
+- An automated test that proved overall ROI used totals, not an average of the ROIs.
+- An automated formatter test that covered rounding, negatives, and 0.0%.
+- A manual test that checked the row count first, and emptied the tables. This test had the developer verify that the empty dashboard had the appropriate tile displays in place (e.g., $0.00, 0, N/A (spend is 0)).
+- A manual test that re-imported the clean file and compared each tile with separate SQL queries.
+
+**Decisions made:** 
+- The overall ROI being derived from totals, not an average of campaign ROIs. Deriving overall ROI from an average of campaign ROIs gives a campaign with less spend the same importance as one with higher spend, which distorts the result. 
+- Generating the dashboard to display totals for all campaigns instead of being able to filter to one specific campaign. This filter is saved for a future PBI.
+- Using one SELECT SQL query instead of five separate ones for each KPI tiles (excluding ROI).
+- scratch/dashboard-kpi-tiles is committed as proof of the process.
+
+**What was learned:** 
+- In order to keep results proportionate to how the money was actually spent, it's better to derive overall ROI from totals instead of the average of campaign ROIs. This prevents a small campaign with a good ROI to hide a big campaign that is losing money.
+- Invariant culture prevents tests comparing exact values to not break.
+
