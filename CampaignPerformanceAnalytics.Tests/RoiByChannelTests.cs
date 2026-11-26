@@ -41,7 +41,7 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
             checks.Equal("Total Spend", 45256.13m, totals.TotalSpend);
             checks.Equal("Sum of Channel spends", 45256.13m, channels.Sum(c => c.TotalSpend));
 
-            var chart = RoiChart.Build(channels);
+            var chart = RoiChart.Build(channels, totals.HasDailyResults);
             var bars = chart.Bars.ToDictionary(b => b.Name, b => b.Label);
             checks.Equal("Email bar", "155.1%", bars.GetValueOrDefault("Email"));
             checks.Equal("Social bar", "24.8%", bars.GetValueOrDefault("Social"));
@@ -68,8 +68,8 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
                 "Spring Newsletter,email,2026-09-01,100.00,1000,50,5,300.00",
                 "Summer Social,social,2026-09-01,100.00,1000,50,5,250.00");
 
-            var (_, channels) = await GetDashboardAsync();
-            var chart = RoiChart.Build(channels);
+            var (totals, channels) = await GetDashboardAsync();
+            var chart = RoiChart.Build(channels, totals.HasDailyResults);
 
             checks.SequenceEqual("bars top to bottom",
                 ["Email 200.0%", "Social 150.0%", "Display -30.0%"],
@@ -90,16 +90,49 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
                 "Brand Keywords Search,search,2026-09-01,100.00,1000,50,5,300.00",
                 "Generic Keywords Search,search,2026-09-01,10000.00,90000,400,20,5000.00");
 
-            var (_, channels) = await GetDashboardAsync();
+            var (totals, channels) = await GetDashboardAsync();
             var search = channels.Single(c => c.Name == "search");
 
             checks.Equal("search spend", 10100m, search.TotalSpend);
             checks.Equal("search revenue", 5300m, search.TotalRevenue);
 
-            var bar = RoiChart.Build(channels).Bars.Single(b => b.Name == "Search");
+            var bar = RoiChart.Build(channels, totals.HasDailyResults).Bars.Single(b => b.Name == "Search");
             checks.Equal("Search bar", "-47.5%", bar.Label);
             // Ticket 02: the loss is marked negative, so it is drawn growing left.
             checks.Equal("Search bar negative", true, bar.IsNegative);
+        });
+
+    [Fact]
+    public Task Empty_tables_give_the_No_Daily_Results_state_with_every_Channel_left_out() =>
+        RunAsync("03", "Empty tables: state No Daily Results, no bars, all four Channels left out", async checks =>
+        {
+            // InitializeAsync has already emptied results and campaigns.
+            var (totals, channels) = await GetDashboardAsync();
+            var chart = RoiChart.Build(channels, totals.HasDailyResults);
+
+            checks.Equal("state", RoiChartState.NoDailyResults, chart.State);
+            checks.Equal("bar count", 0, chart.Bars.Count);
+            checks.SequenceEqual("left out", ["Display", "Email", "Search", "Social"], chart.LeftOut);
+        });
+
+    [Fact]
+    public Task A_Channel_with_no_Daily_Results_is_left_out_and_the_others_have_bars() =>
+        RunAsync("03", "A Channel with no Daily Results: Display left out, the other three have bars", async checks =>
+        {
+            // Email (300 − 100) ÷ 100 = 200%, search (250 − 100) ÷ 100 = 150%, social (150 − 100) ÷ 100 = 50%.
+            await ImportLinesAsync(Header,
+                "Spring Newsletter,email,2026-09-01,100.00,1000,50,5,300.00",
+                "Summer Social,social,2026-09-01,100.00,1000,50,5,150.00",
+                "Brand Keywords Search,search,2026-09-01,100.00,1000,50,5,250.00");
+
+            var (totals, channels) = await GetDashboardAsync();
+            var chart = RoiChart.Build(channels, totals.HasDailyResults);
+
+            checks.Equal("state", RoiChartState.Bars, chart.State);
+            checks.SequenceEqual("bars top to bottom",
+                ["Email 200.0%", "Search 150.0%", "Social 50.0%"],
+                chart.Bars.Select(b => $"{b.Name} {b.Label}"));
+            checks.SequenceEqual("left out", ["Display"], chart.LeftOut);
         });
 
     // ---- helpers ----

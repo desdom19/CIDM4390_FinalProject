@@ -23,7 +23,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("search", 100m, 300m),
                 new ChannelTotals("email", 100m, 200m),
                 new ChannelTotals("social", 100m, 150m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.SequenceEqual("widths", [100m, 50m, 25m], chart.Bars.Select(b => b.Width));
         });
@@ -35,7 +35,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
             var chart = RoiChart.Build([
                 new ChannelTotals("email", 100m, 250m),
                 new ChannelTotals("search", 100m, 120m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.Equal("zero line", 0m, chart.ZeroLine);
         });
@@ -48,7 +48,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
             var chart = RoiChart.Build([
                 new ChannelTotals("email", 100m, 300m),
                 new ChannelTotals("display", 500m, 500m),
-            ]);
+            ], hasDailyResults: true);
 
             var display = chart.Bars[1];
             checks.Equal("display width", 0m, display.Width);
@@ -64,7 +64,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("social", 100m, 200m),
                 new ChannelTotals("search", 100m, 200m),
                 new ChannelTotals("display", 100m, 200m),
-            ]);
+            ], hasDailyResults: true);
 
             // Every ROI is 100%, so ticket 02's tie rule orders them by stored name A to Z.
             checks.SequenceEqual("display names", ["Display", "Email", "Search", "Social"], chart.Bars.Select(b => b.Name));
@@ -82,7 +82,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 var chart = RoiChart.Build([
                     new ChannelTotals("email", 100m, 400m),
                     new ChannelTotals("social", 100m, 200m),
-                ]);
+                ], hasDailyResults: true);
 
                 checks.SequenceEqual("CSS widths", ["100%", "33.33%"], chart.Bars.Select(b => b.CssWidth));
                 checks.SequenceEqual("labels", ["300.0%", "100.0%"], chart.Bars.Select(b => b.Label));
@@ -102,7 +102,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("social", 0m, 0m),
                 new ChannelTotals("search", 0m, 0m),
                 new ChannelTotals("display", 0m, 0m),
-            ]);
+            ], hasDailyResults: false);
 
             checks.Equal("bar count", 0, chart.Bars.Count);
         });
@@ -114,7 +114,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
             var chart = RoiChart.Build([
                 new ChannelTotals("email", 100m, 100m),
                 new ChannelTotals("social", 250m, 250m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.Equal("zero line", 0m, chart.ZeroLine);
             checks.SequenceEqual("widths", [0m, 0m], chart.Bars.Select(b => b.Width));
@@ -135,7 +135,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("email", 100000m, 112340m),
                 new ChannelTotals("search", 100m, 150m),
                 new ChannelTotals("social", 100000m, 112345m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.SequenceEqual("order", ["Search", "Social", "Email", "Display"], chart.Bars.Select(b => b.Name));
             checks.SequenceEqual("labels", ["50.0%", "12.3%", "12.3%", "5.0%"], chart.Bars.Select(b => b.Label));
@@ -151,7 +151,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("search", 50m, 100m),
                 new ChannelTotals("email", 10m, 20m),
                 new ChannelTotals("display", 1m, 2m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.SequenceEqual("order", ["Display", "Email", "Search", "Social"], chart.Bars.Select(b => b.Name));
         });
@@ -166,7 +166,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("display", 100m, 50m),
                 new ChannelTotals("email", 100m, 300m),
                 new ChannelTotals("search", 100m, 200m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.SequenceEqual("order", ["Email", "Search", "Display"], chart.Bars.Select(b => b.Name));
             checks.SequenceEqual("widths", [80m, 40m, 20m], chart.Bars.Select(b => b.Width));
@@ -186,7 +186,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
             var chart = RoiChart.Build([
                 new ChannelTotals("search", 100m, 52.50m),
                 new ChannelTotals("display", 100m, 70m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.Equal("zero line", 100m, chart.ZeroLine);
             checks.SequenceEqual("order", ["Display", "Search"], chart.Bars.Select(b => b.Name));
@@ -207,7 +207,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("social", 100m, 125m),
                 new ChannelTotals("search", 100m, 90m),
                 new ChannelTotals("display", 100m, 75m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.Equal("zero line", 25m, chart.ZeroLine);
             checks.SequenceEqual("widths", [75m, 25m, 10m, 25m], chart.Bars.Select(b => b.Width));
@@ -226,7 +226,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("display", 100m, 50m),
                 new ChannelTotals("email", 100m, 300m),
                 new ChannelTotals("search", 100m, 200m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.SequenceEqual("bar left edges", [20m, 20m, 0m], chart.Bars.Select(b => b.Left));
             checks.SequenceEqual("bar styles",
@@ -246,7 +246,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 new ChannelTotals("email", 100m, 200m),
                 new ChannelTotals("search", 100m, 100m),
                 new ChannelTotals("display", 100m, 0m),
-            ]);
+            ], hasDailyResults: true);
 
             var search = chart.Bars[1];
             checks.Equal("search label", "0.0%", search.Label);
@@ -268,7 +268,7 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
                 var chart = RoiChart.Build([
                     new ChannelTotals("search", 100m, 52.50m),
                     new ChannelTotals("display", 100m, 70m),
-                ]);
+                ], hasDailyResults: true);
 
                 checks.SequenceEqual("bar styles",
                     ["left: 36.84%; width: 63.16%", "left: 0%; width: 100%"],
@@ -291,14 +291,81 @@ public sealed class RoiChartTests(VerificationReport report, ITestOutputHelper o
             var allPositive = RoiChart.Build([
                 new ChannelTotals("email", 100m, 200m),
                 new ChannelTotals("search", 100m, 150m),
-            ]);
+            ], hasDailyResults: true);
             var mixed = RoiChart.Build([
                 new ChannelTotals("email", 100m, 200m),
                 new ChannelTotals("display", 100m, 70m),
-            ]);
+            ], hasDailyResults: true);
 
             checks.Equal("all positive", "padding: 0 5.5rem 0 0", allPositive.CssTrackPadding);
             checks.Equal("mixed", "padding: 0 5.5rem", mixed.CssTrackPadding);
+        });
+
+    // ---- ticket 03: left-out Channels and the three states ----
+
+    [Fact]
+    public void Channels_with_total_spend_0_are_left_out_and_listed_A_to_Z() =>
+        Run("03", "Chart: Channels with total spend 0 left out, listed A to Z", checks =>
+        {
+            // Social and display spend nothing (social still earns), given Z to A; email and search have spend.
+            var chart = RoiChart.Build([
+                new ChannelTotals("social", 0m, 40m),
+                new ChannelTotals("search", 100m, 150m),
+                new ChannelTotals("email", 100m, 200m),
+                new ChannelTotals("display", 0m, 0m),
+            ], hasDailyResults: true);
+
+            checks.Equal("state", RoiChartState.Bars, chart.State);
+            checks.SequenceEqual("bars", ["Email 100.0%", "Search 50.0%"], chart.Bars.Select(b => $"{b.Name} {b.Label}"));
+            checks.SequenceEqual("left out", ["Display", "Social"], chart.LeftOut);
+        });
+
+    [Fact]
+    public void No_Daily_Results_gives_the_No_Daily_Results_state_and_no_bars() =>
+        Run("03", "Chart: no Daily Results gives state No Daily Results, no bars, every Channel left out", checks =>
+        {
+            var chart = RoiChart.Build([
+                new ChannelTotals("email", 0m, 0m),
+                new ChannelTotals("social", 0m, 0m),
+                new ChannelTotals("search", 0m, 0m),
+                new ChannelTotals("display", 0m, 0m),
+            ], hasDailyResults: false);
+
+            checks.Equal("state", RoiChartState.NoDailyResults, chart.State);
+            checks.Equal("bar count", 0, chart.Bars.Count);
+            checks.SequenceEqual("left out", ["Display", "Email", "Search", "Social"], chart.LeftOut);
+        });
+
+    [Fact]
+    public void Daily_Results_but_no_spend_gives_the_No_spend_state_and_no_bars() =>
+        Run("03", "Chart: Daily Results but every spend 0 gives state No spend, no bars, every Channel left out", checks =>
+        {
+            // Email has Daily Results that earned revenue but spent nothing; the rest have none.
+            var chart = RoiChart.Build([
+                new ChannelTotals("email", 0m, 199.75m),
+                new ChannelTotals("social", 0m, 0m),
+                new ChannelTotals("search", 0m, 0m),
+                new ChannelTotals("display", 0m, 0m),
+            ], hasDailyResults: true);
+
+            checks.Equal("state", RoiChartState.NoSpend, chart.State);
+            checks.Equal("bar count", 0, chart.Bars.Count);
+            checks.SequenceEqual("left out", ["Display", "Email", "Search", "Social"], chart.LeftOut);
+        });
+
+    [Fact]
+    public void A_Channel_with_spend_and_no_revenue_is_shown_at_minus_100_percent() =>
+        Run("03", "Chart: a Channel with spend but no revenue is shown at -100.0%, not left out", checks =>
+        {
+            // Display: (0 − 250) ÷ 250 = −100%.
+            var chart = RoiChart.Build([
+                new ChannelTotals("email", 100m, 200m),
+                new ChannelTotals("display", 250m, 0m),
+            ], hasDailyResults: true);
+
+            checks.Equal("state", RoiChartState.Bars, chart.State);
+            checks.SequenceEqual("bars", ["Email 100.0%", "Display -100.0%"], chart.Bars.Select(b => $"{b.Name} {b.Label}"));
+            checks.Equal("left out", 0, chart.LeftOut.Count);
         });
 
     private void Run(string sourceTicket, string title, Action<TestChecks> body)

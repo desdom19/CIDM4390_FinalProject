@@ -9,8 +9,16 @@ namespace CampaignPerformanceAnalytics.Services;
 /// </summary>
 public static class RoiChart
 {
-    public static RoiChartModel Build(IReadOnlyList<ChannelTotals> channels)
+    /// <param name="hasDailyResults">Whether there is any Daily Result at all; with none, the chart asks for an import.</param>
+    public static RoiChartModel Build(IReadOnlyList<ChannelTotals> channels, bool hasDailyResults)
     {
+        // A Channel with no spend has no ROI to draw; it is named instead, by stored name A to Z.
+        var leftOut = channels
+            .Where(c => c.Roi is null)
+            .OrderBy(c => c.Name, StringComparer.Ordinal)
+            .Select(c => DisplayName(c.Name))
+            .ToList();
+
         // Only Channels with spend have an ROI to draw.
         var withRoi = channels
             .Where(c => c.Roi is not null)
@@ -23,7 +31,9 @@ public static class RoiChart
 
         if (withRoi.Count == 0)
         {
-            return new RoiChartModel([], ZeroLine: 0m);
+            // Nothing to draw: either nothing has been imported, or every Channel's spend is 0.
+            var state = hasDailyResults ? RoiChartState.NoSpend : RoiChartState.NoDailyResults;
+            return new RoiChartModel(state, [], ZeroLine: 0m, leftOut);
         }
 
         // Positive and negative bars share one scale: the largest gain plus the largest loss, so the
@@ -47,7 +57,7 @@ public static class RoiChart
             })
             .ToList();
 
-        return new RoiChartModel(bars, zeroLine);
+        return new RoiChartModel(RoiChartState.Bars, bars, zeroLine, leftOut);
     }
 
     /// <summary>
@@ -64,9 +74,24 @@ public static class RoiChart
             : char.ToUpperInvariant(storedName[0]) + storedName[1..];
 }
 
-/// <summary>The bars of the ROI by Channel chart, in the order they are drawn: highest ROI first.</summary>
+/// <summary>What the ROI by Channel chart area shows.</summary>
+public enum RoiChartState
+{
+    /// <summary>At least one Channel has spend: its bars are drawn.</summary>
+    Bars,
+
+    /// <summary>There are no Daily Results at all: no bars, and a link to import a CSV.</summary>
+    NoDailyResults,
+
+    /// <summary>There are Daily Results, but every Channel's total spend is 0: no bars, and no link.</summary>
+    NoSpend,
+}
+
+/// <summary>The ROI by Channel chart: its state and its bars, in the order they are drawn: highest ROI first.</summary>
+/// <param name="Bars">One per Channel with spend; empty unless <paramref name="State"/> is <see cref="RoiChartState.Bars"/>.</param>
 /// <param name="ZeroLine">Where the zero line sits, as a percentage across the chart track from its left edge.</param>
-public record RoiChartModel(IReadOnlyList<RoiBar> Bars, decimal ZeroLine)
+/// <param name="LeftOut">The display names of the Channels with total spend exactly 0, by stored name A to Z, in every state.</param>
+public record RoiChartModel(RoiChartState State, IReadOnlyList<RoiBar> Bars, decimal ZeroLine, IReadOnlyList<string> LeftOut)
 {
     /// <summary>The zero line's position as CSS for an inline style, e.g. 20%; see <see cref="RoiBar.CssWidth"/>.</summary>
     public string CssZeroLine => CssPercent.Of(ZeroLine);
