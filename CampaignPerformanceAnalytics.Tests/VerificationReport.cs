@@ -25,7 +25,14 @@ public sealed record ReportFeature(string Folder, string Subject, string Databas
         "automated dashboard KPI tile tests",
         $"`{TestDatabase.RequiredDatabaseName}` for the `DashboardService` tests (results and campaigns emptied before each test; Channels untouched); "
         + "the `KpiFormatter` tests use no database",
-        "`DashboardService.GetKpiTotalsAsync`, whose totals are also passed through `KpiFormatter`, and `KpiFormatter` on its own.");
+        "`DashboardService.GetDashboardAsync`, whose totals are also passed through `KpiFormatter`, and `KpiFormatter` on its own.");
+
+    public static readonly ReportFeature RoiByChannelBarChart = new(
+        "roi-by-channel-bar-chart",
+        "automated ROI by Channel bar chart tests",
+        $"`{TestDatabase.RequiredDatabaseName}` for the `DashboardService` tests (results and campaigns emptied before each test; Channels untouched); "
+        + "the `RoiChart` tests use no database",
+        "`DashboardService.GetDashboardAsync`, whose Channel totals are also passed through `RoiChart`, and `RoiChart` on its own.");
 }
 
 /// <summary>

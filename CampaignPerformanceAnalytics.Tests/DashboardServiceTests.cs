@@ -126,7 +126,7 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
     /// <summary>Reads the totals, requiring the read to have succeeded.</summary>
     private async Task<KpiTotals> GetTotalsAsync()
     {
-        var result = await database.CreateDashboardService().GetKpiTotalsAsync();
+        var result = await database.CreateDashboardService().GetDashboardAsync();
         Assert.False(result.Failed, result.ErrorMessage);
         return result.Totals;
     }
@@ -170,7 +170,7 @@ public sealed class DashboardServiceDatabaseFailureTests(VerificationReport repo
             "Database can't be reached: error message, no totals", output);
         try
         {
-            var result = await new DashboardService(UnreachableConnectionString).GetKpiTotalsAsync();
+            var result = await new DashboardService(UnreachableConnectionString).GetDashboardAsync();
 
             checks.Equal("Failed", true, result.Failed);
             checks.Equal("Error message",

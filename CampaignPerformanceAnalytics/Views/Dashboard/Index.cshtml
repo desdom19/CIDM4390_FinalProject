@@ -47,4 +47,27 @@ else
             </div>
         }
     </div>
+
+    @* Everything drawn here comes from RoiChart; the markup only loops over its bars. *@
+    var chart = RoiChart.Build(Model.ChannelTotals);
+
+    <section class="mt-5" aria-labelledby="roi-by-channel-heading">
+        <h2 id="roi-by-channel-heading" class="h4">ROI by Channel</h2>
+        <ul class="list-unstyled mb-0">
+            @foreach (var bar in chart.Bars)
+            {
+                @* Read as text, e.g. "Email 155.1%"; the bar itself is hidden from screen readers. *@
+                <li class="d-flex align-items-center mb-2">
+                    <span class="flex-shrink-0" style="width: 5.5rem">@bar.Name</span>
+                    @* The right padding leaves room for the longest label, so a full-length bar's label is never clipped. *@
+                    <div class="flex-grow-1" style="padding-right: 5.5rem">
+                        <div class="position-relative border-start border-secondary-subtle" style="height: 1.5rem">
+                            <div class="bg-secondary h-100" style="width: @bar.CssWidth" aria-hidden="true"></div>
+                            <span class="position-absolute top-50 translate-middle-y ps-2 text-nowrap" style="left: @bar.CssWidth">@bar.Label</span>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
 }
