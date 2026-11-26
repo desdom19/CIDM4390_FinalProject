@@ -46,21 +46,45 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
             checks.Equal("Overall ROI tile", "81.4%", KpiFormatter.Roi(totals.OverallRoi));
         });
 
+    /// <summary>
+    /// The zero-spend test's tile checks stay in this feature's report; ROI by Channel ticket 03
+    /// extends the test with a second set of chart checks, written to that PBI's report. Both sets must match.
+    /// </summary>
     [Fact]
-    public Task Zero_total_spend_gives_no_ROI_but_keeps_the_real_revenue() =>
-        RunAsync("02", "Zero total spend: ROI N/A, revenue still shown", async checks =>
+    public async Task Zero_total_spend_gives_no_ROI_but_keeps_the_real_revenue()
+    {
+        var tileChecks = report.StartTest(ReportFeature.DashboardKpiTiles, "02",
+            "Zero total spend: ROI N/A, revenue still shown", output);
+        var chartChecks = report.StartTest(ReportFeature.RoiByChannelBarChart, "03",
+            "Zero total spend: chart shows the no-spend message (extends PBI 5's zero-spend test)", output);
+        try
         {
             await ImportLinesAsync(Header,
                 "Cart Reminder Email,email,2026-09-01,0.00,500,20,2,120.50",
                 "Cart Reminder Email,email,2026-09-02,0.00,450,18,1,79.25");
 
-            var totals = await GetTotalsAsync();
+            var (totals, channels) = await GetDashboardAsync();
 
-            checks.Equal("Total Spend", 0m, totals.TotalSpend);
-            checks.Equal("Overall ROI", (decimal?)null, totals.OverallRoi);
-            checks.Equal("Overall ROI tile", "N/A (spend is 0)", KpiFormatter.Roi(totals.OverallRoi));
-            checks.Equal("Total Revenue tile", "$199.75", KpiFormatter.Money(totals.TotalRevenue));
-        });
+            tileChecks.Equal("Total Spend", 0m, totals.TotalSpend);
+            tileChecks.Equal("Overall ROI", (decimal?)null, totals.OverallRoi);
+            tileChecks.Equal("Overall ROI tile", "N/A (spend is 0)", KpiFormatter.Roi(totals.OverallRoi));
+            tileChecks.Equal("Total Revenue tile", "$199.75", KpiFormatter.Money(totals.TotalRevenue));
+
+            var chart = RoiChart.Build(channels, totals.HasDailyResults);
+
+            chartChecks.Equal("state", RoiChartState.NoSpend, chart.State);
+            chartChecks.Equal("bar count", 0, chart.Bars.Count);
+            chartChecks.SequenceEqual("left out", ["Display", "Email", "Search", "Social"], chart.LeftOut);
+        }
+        catch (Exception ex)
+        {
+            tileChecks.Stopped(ex);
+            chartChecks.Stopped(ex);
+            throw;
+        }
+        tileChecks.AssertAll();
+        chartChecks.AssertAll();
+    }
 
     [Fact]
     public Task Overall_ROI_is_calculated_from_the_totals_not_averaged_over_Campaigns() =>
@@ -124,11 +148,14 @@ public sealed class DashboardServiceTests(TestDatabase database, VerificationRep
     }
 
     /// <summary>Reads the totals, requiring the read to have succeeded.</summary>
-    private async Task<KpiTotals> GetTotalsAsync()
+    private async Task<KpiTotals> GetTotalsAsync() => (await GetDashboardAsync()).Totals;
+
+    /// <summary>Reads the totals and the Channel totals, requiring the read to have succeeded.</summary>
+    private async Task<(KpiTotals Totals, IReadOnlyList<ChannelTotals> Channels)> GetDashboardAsync()
     {
-        var result = await database.CreateDashboardService().GetKpiTotalsAsync();
+        var result = await database.CreateDashboardService().GetDashboardAsync();
         Assert.False(result.Failed, result.ErrorMessage);
-        return result.Totals;
+        return (result.Totals, result.ChannelTotals);
     }
 
     private static decimal? RoundedTo4Decimals(decimal? value) => value is null ? null : Math.Round(value.Value, 4);
@@ -167,15 +194,17 @@ public sealed class DashboardServiceDatabaseFailureTests(VerificationReport repo
     public async Task Unreachable_database_gives_an_error_result_with_no_totals()
     {
         var checks = report.StartTest(ReportFeature.DashboardKpiTiles, "03",
-            "Database can't be reached: error message, no totals", output);
+            "Database can't be reached: error message, no totals, no Channel totals", output);
         try
         {
-            var result = await new DashboardService(UnreachableConnectionString).GetKpiTotalsAsync();
+            var result = await new DashboardService(UnreachableConnectionString).GetDashboardAsync();
 
             checks.Equal("Failed", true, result.Failed);
             checks.Equal("Error message",
                 "The dashboard couldn't load because of a database error. Try again later.", result.ErrorMessage);
             checks.Equal("Totals", (KpiTotals?)null, result.Totals);
+            // ROI by Channel ticket 03: the chart gets no figures either, so a failure can't show as empty bars.
+            checks.Equal("Channel totals", (IReadOnlyList<ChannelTotals>?)null, result.ChannelTotals);
         }
         catch (Exception ex)
         {

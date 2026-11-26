@@ -47,4 +47,47 @@ else
             </div>
         }
     </div>
+
+    @* Everything drawn here comes from RoiChart; the markup only picks its state's message or loops over its bars. *@
+    var chart = RoiChart.Build(Model.ChannelTotals, totals.HasDailyResults);
+
+    <section class="mt-5" aria-labelledby="roi-by-channel-heading">
+        <h2 id="roi-by-channel-heading" class="h4">ROI by Channel</h2>
+        @if (chart.State == RoiChartState.NoDailyResults)
+        {
+            <p class="text-muted mb-0">
+                No Daily Results yet. <a asp-controller="Import" asp-action="Index">Import a CSV</a> to see ROI by Channel.
+            </p>
+        }
+        else if (chart.State == RoiChartState.NoSpend)
+        {
+            @* Daily Results are already there, so no link to import more. *@
+            <p class="text-muted mb-0">No Channel has any spend yet, so ROI can't be shown.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0">
+                @foreach (var bar in chart.Bars)
+                {
+                    @* Read as text, e.g. "Email 155.1%"; the bar and the zero line are hidden from screen readers. *@
+                    <li class="d-flex align-items-center mb-2">
+                        <span class="flex-shrink-0" style="width: 5.5rem">@bar.Name</span>
+                        @* RoiChart places the bar from the zero line (right for a gain, left for a loss) and its label just past the bar's far end. *@
+                        <div class="flex-grow-1" style="@chart.CssTrackPadding">
+                            <div class="position-relative" style="height: 1.5rem">
+                                <div class="position-absolute top-0 h-100 border-start border-secondary-subtle" style="left: @chart.CssZeroLine" aria-hidden="true"></div>
+                                <div class="position-absolute top-0 h-100 bg-secondary" style="@bar.CssBarStyle" aria-hidden="true"></div>
+                                <span class="position-absolute top-50 translate-middle-y text-nowrap" style="@bar.CssLabelStyle">@bar.Label</span>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+            @* A missing bar is explained, so it doesn't look like a bug; shown only when a Channel is left out. *@
+            if (chart.LeftOut.Count > 0)
+            {
+                <p class="small text-muted mt-2 mb-0">Not shown (no spend): @(string.Join(", ", chart.LeftOut)).</p>
+            }
+        }
+    </section>
 }

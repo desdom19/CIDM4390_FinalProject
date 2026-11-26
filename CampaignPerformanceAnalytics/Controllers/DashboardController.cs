@@ -15,6 +15,6 @@ public class DashboardController : Controller
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        return View(await _dashboardService.GetKpiTotalsAsync());
+        return View(await _dashboardService.GetDashboardAsync());
     }
 }
