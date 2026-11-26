@@ -143,3 +143,63 @@ Tests:
 - In order to keep results proportionate to how the money was actually spent, it's better to derive overall ROI from totals instead of the average of campaign ROIs. This prevents a small campaign with a good ROI to hide a big campaign that is losing money.
 - Invariant culture prevents tests comparing exact values to not break.
 
+
+## PBI 6 Agent log
+
+**Tool:** 
+Claude Agentic Coding was used to generate an ROI bar chart per channel under the KPI tiles in the dashboard view. Additionally, it was used to generate ROI percentage labels per bar.
+
+**Process used:** 
+The grill-with-docs process was used to turn PBI 6 into a spec and four tickets (the 4th ticket was a manual check and a data flow diagram reserved for the developer). This was followed by a ticket-by-ticket implementation that created a ROI by channel bar chart under the KPI tiles in the Dashboard view, sorted bars from highest to lowest ROI, scaled bar width and size, and bar chart error handling for left-out channels, the empty state and database errors.
+
+**What it generated:** 
+
+Spec and tickets:
+- spec.md: the PBI 6 spec.
+- issues/01-tracer-bullet-roi-bars-for-clean-csv.md
+- issues/02-sorting-scaling-and-negative-bars.md
+- issues/03-left-out-channels-empty-state-and-error.md
+- issues/04-final-manual-check-and-data-flow-diagram.md
+- manual-roi-queries.sql
+- verification-report-tests.md
+- verification-report-manual.md
+- images/emptyroibychannel.png and images/roibychannelchartclean.png
+
+App Code:
+- Services/DashboardService.cs
+- Services/RoiChart.cs 
+- Models/DashboardResult.cs
+- Controllers/DashboardController.cs: calls the new GetDashboardAsync().
+- Views/Dashboard/Index.cshtml
+Tests:
+- RoiByChannelTests.cs 
+- RoiChartTests.cs 
+- DashboardServiceTests.cs
+- VerificationReport.cs
+
+**How the ROI by channel bar chart creation was checked:** 
+- Automatic tests ran on a test copy of the database and did the following:
+    - Checked that chart displayed the correct numbers and in the right order
+    - Checked error-handling for empty state, individual channel with no spend, and channel losing money cases
+- Manual tests ran by the developer and did the following:
+    - Emptied campaign_analytics database and verified an empty bar chart with an option to "Import a CSV"
+    - Imported the clean sample CSV file and saw the four bars per channel with the correct percentages: Email 155.1%, Search 131.4%, Display 46.4%, Social 24.8%.
+    - Ran manual SQL queries that verified the percentages were correct
+
+**Decisions made:** 
+- Each channel's ROI comes from its total revenue and total spend. It is never derived from the average of its campaigns' ROIs, as that could distort the final results.
+- The bars are sorted from highest ROI % to lowest ROI %. If two channels have the same ROI %, they're sorted alphabetically (A-Z).
+- The bars are displayed horizontally and under the KPI tiles. 
+- Channels with a positive ROI % grow to the right, while channels with a negative ROI % grow to the left.
+- A channel with no spend is left out of the bar chart, and a note explaining its absence is displayed to the user.
+- No data imported prompts the user to "Import a CSV" with a link to do so.
+- Data imported but no spend across any of the channels displays "No channel has any spend yet" to the user.
+- Database failures prompts and displays an error message.
+- scratch/roi-by-channel-bar-chart is committed as proof of the process.
+
+**What was learned:** 
+- The clean sample data CSV file does not account for edge cases like an individual channel having no spend, a negative ROI, an empty results table/no data at all, or database failures. Going through the grill-me-process helped unveil these cases, and implement error-handling tests that prevent the dashboard from crashing if future cases do occur.
+- Choosing HTML and CSS bars over a chart library ensured that every label was text that could be checked against SQL.
+- Keeping calculations out of the view ensures that the math can be reached by the automated tests. It's better to do calculations in testable code, and let the page only display the results of that code. In this PBI, the logic was moved into RoiChart instead of keeping it in the view.
+
+
