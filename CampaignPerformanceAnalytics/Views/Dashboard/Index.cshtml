@@ -56,14 +56,15 @@ else
         <ul class="list-unstyled mb-0">
             @foreach (var bar in chart.Bars)
             {
-                @* Read as text, e.g. "Email 155.1%"; the bar itself is hidden from screen readers. *@
+                @* Read as text, e.g. "Email 155.1%"; the bar and the zero line are hidden from screen readers. *@
                 <li class="d-flex align-items-center mb-2">
                     <span class="flex-shrink-0" style="width: 5.5rem">@bar.Name</span>
-                    @* The right padding leaves room for the longest label, so a full-length bar's label is never clipped. *@
-                    <div class="flex-grow-1" style="padding-right: 5.5rem">
-                        <div class="position-relative border-start border-secondary-subtle" style="height: 1.5rem">
-                            <div class="bg-secondary h-100" style="width: @bar.CssWidth" aria-hidden="true"></div>
-                            <span class="position-absolute top-50 translate-middle-y ps-2 text-nowrap" style="left: @bar.CssWidth">@bar.Label</span>
+                    @* RoiChart places the bar from the zero line (right for a gain, left for a loss) and its label just past the bar's far end. *@
+                    <div class="flex-grow-1" style="@chart.CssTrackPadding">
+                        <div class="position-relative" style="height: 1.5rem">
+                            <div class="position-absolute top-0 h-100 border-start border-secondary-subtle" style="left: @chart.CssZeroLine" aria-hidden="true"></div>
+                            <div class="position-absolute top-0 h-100 bg-secondary" style="@bar.CssBarStyle" aria-hidden="true"></div>
+                            <span class="position-absolute top-50 translate-middle-y text-nowrap" style="@bar.CssLabelStyle">@bar.Label</span>
                         </div>
                     </div>
                 </li>

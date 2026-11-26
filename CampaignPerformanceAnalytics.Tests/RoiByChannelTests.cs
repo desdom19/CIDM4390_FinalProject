@@ -24,7 +24,8 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
 
     [Fact]
     public Task Clean_sample_CSV_gives_each_Channels_totals_ROI_and_label() =>
-        RunAsync("01", "Clean sample CSV: each Channel's spend, revenue, ROI and label", async checks =>
+        // Built in ticket 01; ticket 02 extends it with the order and the negative checks.
+        RunAsync("01, 02", "Clean sample CSV: each Channel's spend, revenue, ROI and label, sorted, none negative", async checks =>
         {
             await ImportSampleAsync("campaign_results_clean.csv");
 
@@ -40,16 +41,48 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
             checks.Equal("Total Spend", 45256.13m, totals.TotalSpend);
             checks.Equal("Sum of Channel spends", 45256.13m, channels.Sum(c => c.TotalSpend));
 
-            var bars = RoiChart.Build(channels).Bars.ToDictionary(b => b.Name, b => b.Label);
+            var chart = RoiChart.Build(channels);
+            var bars = chart.Bars.ToDictionary(b => b.Name, b => b.Label);
             checks.Equal("Email bar", "155.1%", bars.GetValueOrDefault("Email"));
             checks.Equal("Social bar", "24.8%", bars.GetValueOrDefault("Social"));
             checks.Equal("Search bar", "131.4%", bars.GetValueOrDefault("Search"));
             checks.Equal("Display bar", "46.4%", bars.GetValueOrDefault("Display"));
+
+            // Ticket 02: highest ROI first, and none is negative, so the zero line is at the left edge.
+            checks.SequenceEqual("bars top to bottom",
+                ["Email 155.1%", "Search 131.4%", "Display 46.4%", "Social 24.8%"],
+                chart.Bars.Select(b => $"{b.Name} {b.Label}"));
+            checks.SequenceEqual("negative", [false, false, false, false], chart.Bars.Select(b => b.IsNegative));
+            checks.Equal("zero line", 0m, chart.ZeroLine);
+            checks.Equal("has negative bars", false, chart.HasNegativeBars);
+        });
+
+    [Fact]
+    public Task A_Channel_that_spends_more_than_it_earns_is_a_negative_bar_below_the_positives() =>
+        RunAsync("02", "A Channel spending more than it earns: minus label, negative, sorted last, zero line partway", async checks =>
+        {
+            // Email (300 − 100) ÷ 100 = 200%, social (250 − 100) ÷ 100 = 150%, display
+            // (70 − 100) ÷ 100 = −30%. Scale = 2 + 0.3 = 2.3, so the zero line is at 0.3 ÷ 2.3 = 13.04%.
+            await ImportLinesAsync(Header,
+                "Display Retargeting,display,2026-09-01,100.00,1000,50,5,70.00",
+                "Spring Newsletter,email,2026-09-01,100.00,1000,50,5,300.00",
+                "Summer Social,social,2026-09-01,100.00,1000,50,5,250.00");
+
+            var (_, channels) = await GetDashboardAsync();
+            var chart = RoiChart.Build(channels);
+
+            checks.SequenceEqual("bars top to bottom",
+                ["Email 200.0%", "Social 150.0%", "Display -30.0%"],
+                chart.Bars.Select(b => $"{b.Name} {b.Label}"));
+            checks.SequenceEqual("negative", [false, false, true], chart.Bars.Select(b => b.IsNegative));
+            checks.Equal("zero line partway across", true, chart.ZeroLine is > 0m and < 100m);
+            checks.Equal("CSS zero line", "13.04%", chart.CssZeroLine);
         });
 
     [Fact]
     public Task Channel_ROI_is_calculated_from_its_totals_not_averaged_over_Campaigns() =>
-        RunAsync("01", "Channel ROI uses totals, not an average of its Campaigns", async checks =>
+        // Built in ticket 01; ticket 02 extends it with the negative check.
+        RunAsync("01, 02", "Channel ROI uses totals, not an average of its Campaigns; drawn as a negative bar", async checks =>
         {
             // The glossary's ROI example on one Channel: Campaign ROIs of +200% and −50% average +75%,
             // but the Channel's totals give (5,300 − 10,100) ÷ 10,100 = −47.5%.
@@ -65,6 +98,8 @@ public sealed class RoiByChannelTests(TestDatabase database, VerificationReport 
 
             var bar = RoiChart.Build(channels).Bars.Single(b => b.Name == "Search");
             checks.Equal("Search bar", "-47.5%", bar.Label);
+            // Ticket 02: the loss is marked negative, so it is drawn growing left.
+            checks.Equal("Search bar negative", true, bar.IsNegative);
         });
 
     // ---- helpers ----
