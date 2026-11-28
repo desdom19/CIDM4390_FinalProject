@@ -1,0 +1,25 @@
+@model LogInPage
+@{
+    ViewData["Title"] = "Log in";
+}
+
+<h1>Log in</h1>
+<p>Log in to view the dashboard and import campaign data.</p>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert" style="max-width: 24rem;">@Model.ErrorMessage</div>
+}
+
+@* The form tag helper adds the anti-forgery token. The password box never gets a value, so it is empty whenever logging in fails. *@
+<form asp-controller="Account" asp-action="Login" method="post" class="mb-4" style="max-width: 24rem;">
+    <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <input type="text" id="username" name="Username" value="@Model.Username" autocomplete="username" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" id="password" name="Password" autocomplete="current-password" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Log in</button>
+</form>
