@@ -33,6 +33,13 @@ public sealed record ReportFeature(string Folder, string Subject, string Databas
         $"`{TestDatabase.RequiredDatabaseName}` for the `DashboardService` tests (results and campaigns emptied before each test; Channels untouched); "
         + "the `RoiChart` tests use no database",
         "`DashboardService.GetDashboardAsync`, whose Channel totals are also passed through `RoiChart`, and `RoiChart` on its own.");
+
+    public static readonly ReportFeature LogInLogOut = new(
+        "login-logout",
+        "automated log in and log out tests",
+        $"`{TestDatabase.RequiredDatabaseName}` for the `UserService` tests (users emptied before each test; made-up passwords only, "
+        + "never the real seed secrets); the controller attribute tests use no database",
+        "`UserService.SeedAsync` and `UserService.LogInAsync`, and the `[Authorize]` / `[AllowAnonymous]` attributes on the controllers.");
 }
 
 /// <summary>

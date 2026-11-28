@@ -43,12 +43,32 @@ public sealed class TestDatabase
 
     public DashboardService CreateDashboardService() => new(_connectionString);
 
+    public UserService CreateUserService() => new(_connectionString);
+
+    /// <summary>Empties the users table. It has no link to the campaign tables.</summary>
+    public Task EmptyUsersAsync() => ExecuteAsync("DELETE FROM users;");
+
     /// <summary>Empties results and campaigns. Channels are left alone.</summary>
     public async Task EmptyResultsAndCampaignsAsync()
     {
         // results first: it references campaigns.
         await ExecuteAsync("DELETE FROM results;");
         await ExecuteAsync("DELETE FROM campaigns;");
+    }
+
+    /// <summary>Every row of the users table, by username. The hash is compared, never shown in a report.</summary>
+    public async Task<IReadOnlyList<StoredUser>> GetUsersAsync()
+    {
+        await using var connection = await OpenAsync();
+        await using var command = new MySqlCommand(
+            "SELECT username, role, password_hash FROM users ORDER BY username;", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        var users = new List<StoredUser>();
+        while (await reader.ReadAsync())
+        {
+            users.Add(new StoredUser(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        }
+        return users;
     }
 
     public async Task<long> CountDailyResultsAsync() =>
@@ -132,6 +152,12 @@ public sealed class TestDatabase
 public record StoredCampaign(string Name, string ChannelName, DateOnly StartDate, DateOnly EndDate, decimal? RoiGoal);
 
 public record StoredDailyResult(DateOnly Date, decimal Spend, int Impressions, int Clicks, int Leads, decimal Revenue);
+
+/// <summary>A row of the users table. ToString leaves the hash out, so the report shows only its first characters.</summary>
+public record StoredUser(string Username, string Role, string PasswordHash)
+{
+    public override string ToString() => $"{Username} ({Role}, hash {PasswordHash[..Math.Min(12, PasswordHash.Length)]}…)";
+}
 
 [CollectionDefinition(Name)]
 public sealed class TestDatabaseCollection : ICollectionFixture<TestDatabase>, ICollectionFixture<VerificationReport>

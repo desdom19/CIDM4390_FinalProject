@@ -1,9 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CampaignPerformanceAnalytics.Models;
 using CampaignPerformanceAnalytics.Services;
 
 namespace CampaignPerformanceAnalytics.Controllers;
 
+// On the whole controller, so the CSV import POST needs a logged-in User as well as the page.
+[Authorize]
+// no-store, so pressing Back after logging out can't show a saved copy of the page.
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class ImportController : Controller
 {
     /// <summary>The largest CSV file accepted: 5 MB.</summary>

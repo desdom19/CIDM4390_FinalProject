@@ -35,3 +35,25 @@ _Avoid_: ROI
 **Weak Campaign**:
 A campaign whose total revenue over the period is lower than its total spend (ROI below 0).
 _Avoid_: Losing campaign, failed campaign
+
+### People and access
+
+**User**:
+A person who can log in to see the dashboard and import campaign data. Every User has exactly one Role.
+_Avoid_: Account, login (as a noun), member
+
+**Role**:
+What kind of User someone is: Marketer or Admin.
+_Avoid_: Permission, type, level
+
+**Marketer**:
+A User who works with campaign data. For now a Marketer can do everything an Admin can.
+_Avoid_: Analyst, standard user
+
+**Admin**:
+A User who administers the app. For now an Admin can do everything a Marketer can.
+_Avoid_: Administrator, superuser
+
+**Log in / Log out**:
+To start or end a User's access to the dashboard and campaign data import.
+_Avoid_: Sign in, sign out, sign on
