@@ -1,6 +1,6 @@
 # Verification report: automated dashboard KPI tile tests
 
-- Run: 2026-11-25 19:34:44
+- Run: 2026-11-27 14:32:16
 - Database: `campaign_analytics_test` for the `DashboardService` tests (results and campaigns emptied before each test; Channels untouched); the `KpiFormatter` tests use no database
 - Seam: `DashboardService.GetDashboardAsync`, whose totals are also passed through `KpiFormatter`, and `KpiFormatter` on its own.
 - Tests: 14 of 14 passed

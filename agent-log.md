@@ -203,3 +203,78 @@ Tests:
 - Keeping calculations out of the view ensures that the math can be reached by the automated tests. It's better to do calculations in testable code, and let the page only display the results of that code. In this PBI, the logic was moved into RoiChart instead of keeping it in the view.
 
 
+## PBI 7 Agent log
+
+**Tool:** 
+Claude Agentic Coding was used to generate a users SQL table, password hashing, seeded marketer and admin users, a login page with username and password inputs, cookie authentication, protected Dashboard and Import CSV pages, a nav bar displaying the user logged in, a log out link, error-handling for empty or invalid username and password submissions, error-handling for an unavailable database, and automated tests.
+
+**Process used:** 
+The grill-with-docs process was used to turn PBI 7 into a spec and four tickets (the 4th ticket was a manual check and a log in, log out sequence diagram reserved for the developer). This was followed by a ticket-by-ticket implementation process that was verified one at a time. This created a users table in campaign_analytics_test databases after the developer approved the SQL script, as well as code that created a login page with username and password inputs, cookie authentication, protected Dashboard and Import CSV pages, a nav bar displaying the user logged in, a log out link, error-handling for empty or invalid username and password submissions, error-handling for an unavailable database, and automated tests.
+
+**What it generated:** 
+
+Spec and tickets:
+- spec.md: the PBI 7 spec.
+- issues/01-tracer-bullet-seeded-user-logs-in-to-dashboard.md
+- issues/02-login-errors-and-edge-cases.md
+- issues/03-log-out-nav-bar-and-session-safety.md
+- issues/04-final-manual-check.md
+- create-users-table.sql: creates the users table.
+- verification-report-tests.md
+- verification-report-manual.md
+- images/MarketerLoginLandingPage.png, images/AdminLoginLandingPage.png, images/EmptyUserAndPassCheck.png, images/InvalidUserOrPassCheck.png, images/NotLoggedInDashboardCheck.png, images/NotLoggedInImportCheck.png, images/PasswordHashSQLCheck.png and images/LoggedOut.png
+
+App Code:
+- Services/UserService.cs: logs Users in and seeds the Marketer and Admin.
+- Models/LogInForm.cs
+- Models/LogInPage.cs
+- Models/LogInResult.cs
+- Models/Role.cs
+- Controllers/AccountController.cs: the login page, login submit, and log out.
+- Controllers/DashboardController.cs
+- Controllers/ImportController.cs
+- Controllers/RejectOversizedImportAttribute.cs
+- Program.cs: cookie authentication, 30-minute timeout, and seeding at startup.
+- Views/Account/Login.cshtml
+- Views/Shared/_Layout.cshtml
+
+Tests:
+- UserServiceTests.cs
+- ControllerAccessTests.cs
+- TestDatabase.cs
+- VerificationReport.cs: adds the login-logout report.
+
+
+**How the ROI by channel bar chart creation was checked:** 
+- Automatic tests ran on a test copy of the database and did the following:
+    - Checked that the right password loggged both the marketer and admin accounts
+    - Ensured that a wrong password, an unknown username, a password in different capitalization were all refused
+    - Ensured that empty username or password inputs were refused
+    - Ensured that if the database was down, a user would get Unavailable instead of a crash
+    - 
+    - Checked that the Dashboard and Import pages were protected and unavailable if a user was not logged in
+
+- Manual tests ran by the developer and did the following:
+    - Ran manual SQL query (DESCRIBE users;) to check that four fields (user_id, username, password_hash, and role) were in users table
+    - Ran manual SQL query (SELECT) to check that the two users, marketer and admin, were under the correct roles
+    - Checked that users, marketer and admin, could log in and land on the Dashboard
+    - Checked that a wrong password or an unknown username showed message "Invalid username or password"
+    - Checked that empty input showed "Enter a username and password"
+    - Checked that, while logged out, the Dashboard and Import pages were unavailable and the user would land at login page
+    - Checked that opening the login page while logged in landed on the Dashboard page
+    - Checked that field, password_hash, held hashes and not plain-text passwords
+
+**Decisions made:** 
+- ASP.NET Core gives two options for a login system: ASP.NET Core Identity and Cookie Authentication. Due to only having two Users in the database and the small size of the app, Cookie Authentication with the users table was chosen to avoid out-of-scope features such as a registration page, a password reset, and a lockout. Additionally, ASP.NET Core Identity uses its own tables and EF Core, which did not fit (without installing new packages, using Identity's tables, storing Roles in separate tables, and creating tables with EF Core migrations) with the current users table and the plain SQL that the app uses.
+- Passwords are never saved as plain text, but instead are turned and saved into hashes. This ensures the database protects them and does not easily reveal them.
+- There are only two Users, marketer and admin. Their passwords are kept in User Secrets, not in the code.
+- The Dashboard and Import CSV pages need a login in order to access them, otherwise they are protected.
+- Pressing Back does not save a protected page after a user logs out.
+- Roles are saved but do not do anything yet. Roles will have more of a function in PBI 8.
+- scratch/login-logout is committed as proof of the process.
+
+**What was learned:** 
+- Pressing back after logging out could still give an unauthorized user a view of the protected pages (Dashboard and Import CSV). It was learned that setting a no-store fix would tell the browser to not save the protected pages.
+    - One page was missed at first: the "file too large" error page is made by a filter before the controller runs, so it needed the same fix added on its own. It was learned here that a rule on a controller only covers requests that actually reach the controller. If a filter stops the request, the rule must be added to the filter too.
+
+

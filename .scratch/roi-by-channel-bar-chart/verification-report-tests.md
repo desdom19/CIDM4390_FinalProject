@@ -1,6 +1,6 @@
 # Verification report: automated ROI by Channel bar chart tests
 
-- Run: 2026-11-25 19:34:44
+- Run: 2026-11-27 14:32:16
 - Database: `campaign_analytics_test` for the `DashboardService` tests (results and campaigns emptied before each test; Channels untouched); the `RoiChart` tests use no database
 - Seam: `DashboardService.GetDashboardAsync`, whose Channel totals are also passed through `RoiChart`, and `RoiChart` on its own.
 - Tests: 26 of 26 passed
