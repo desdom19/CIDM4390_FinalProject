@@ -24,6 +24,11 @@ public sealed class RejectOversizedImportAttribute(long maxRequestBytes, string 
             return;
         }
 
+        // This result skips the action, so the controller's [ResponseCache] no-store never runs: set it here,
+        // so pressing Back after logging out can't show a saved copy of this page either.
+        context.HttpContext.Response.Headers.CacheControl = "no-store,no-cache";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+
         var metadataProvider = context.HttpContext.RequestServices.GetRequiredService<IModelMetadataProvider>();
         context.Result = new ViewResult
         {
